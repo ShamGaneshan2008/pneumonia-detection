@@ -1,0 +1,1806 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PneumoScan — AI Pneumonia Detection</title>
+    <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Figtree:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            --navy:      #1a1f2e;
+            --navy-mid:  #222736;
+            --navy-soft: #2c3347;
+            --teal:      #5b8fa8;
+            --teal-dim:  #4a7a91;
+            --teal-glow: rgba(91,143,168,0.12);
+            --teal-line: rgba(91,143,168,0.25);
+            --white:     #f0f2f5;
+            --off:       #d8dde6;
+            --muted:     #7a8499;
+            --surface:   rgba(255,255,255,0.04);
+            --border:    rgba(255,255,255,0.07);
+            --red:       #c0675a;
+            --red-soft:  rgba(192,103,90,0.15);
+            --green:     #5aaa8c;
+            --green-soft:rgba(90,170,140,0.15);
+            --amber:     #c8a870;
+            --amber-soft:rgba(200,168,112,0.12);
+            --orange:    #d4845a;
+            --orange-soft:rgba(212,132,90,0.13);
+        }
+
+        html { scroll-behavior: smooth; }
+
+        body {
+            font-family: 'Figtree', sans-serif;
+            background: var(--navy);
+            color: var(--white);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        @keyframes orbPulse {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50%       { transform: scale(1.15); opacity: 0.6; }
+        }
+
+        /* ── Header ── */
+        header {
+            position: relative; z-index: 10;
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 0 2.5rem;
+            height: 68px;
+            border-bottom: 1px solid var(--border);
+            backdrop-filter: blur(12px);
+            background: rgba(10,22,40,0.85);
+        }
+
+        .logo {
+            display: flex; align-items: center; gap: 10px;
+            font-family: 'Instrument Serif', serif;
+            font-size: 1.35rem;
+            letter-spacing: -0.01em;
+            color: var(--white);
+        }
+
+        .logo-dot {
+            width: 34px; height: 34px;
+            background: var(--teal-glow);
+            border: 1px solid var(--teal-line);
+            border-radius: 9px;
+            display: flex; align-items: center; justify-content: center;
+        }
+
+        .ecg-wrap {
+            display: flex; align-items: center; gap: 10px;
+        }
+
+        .ecg-line {
+            width: 120px; height: 28px;
+            overflow: hidden;
+        }
+
+        .ecg-line svg { animation: ecgScroll 2.4s linear infinite; }
+
+        @keyframes ecgScroll {
+            from { transform: translateX(0); }
+            to   { transform: translateX(-50%); }
+        }
+
+        .status-dot {
+            width: 8px; height: 8px;
+            background: var(--teal);
+            border-radius: 50%;
+            animation: blink 2s ease-in-out infinite;
+        }
+
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50%       { opacity: 0.3; }
+        }
+
+        .status-label {
+            font-size: 0.75rem;
+            color: var(--teal);
+            font-weight: 500;
+            letter-spacing: 0.06em;
+        }
+
+        /* ── Main layout ── */
+        main {
+            position: relative; z-index: 1;
+            max-width: 920px;
+            margin: 0 auto;
+            padding: 3rem 1.5rem 5rem;
+        }
+
+        /* ── Hero ── */
+        .hero {
+            text-align: center;
+            margin-bottom: 3rem;
+            animation: fadeUp 0.6s ease both;
+        }
+
+        @keyframes fadeUp {
+            from { opacity: 0; transform: translateY(16px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+
+        .hero-tag {
+            display: inline-flex; align-items: center; gap: 6px;
+            background: var(--teal-glow);
+            border: 1px solid var(--teal-line);
+            border-radius: 20px;
+            padding: 5px 14px;
+            font-size: 0.72rem;
+            font-weight: 600;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            color: var(--teal);
+            margin-bottom: 1.2rem;
+        }
+
+        .hero h1 {
+            font-family: 'Instrument Serif', serif;
+            font-size: clamp(2rem, 5vw, 3rem);
+            line-height: 1.15;
+            margin-bottom: 0.8rem;
+            letter-spacing: -0.02em;
+        }
+
+        .hero h1 em {
+            font-style: italic;
+            color: var(--teal);
+        }
+
+        .hero p {
+            color: var(--muted);
+            font-size: 1rem;
+            max-width: 480px;
+            margin: 0 auto;
+            line-height: 1.65;
+        }
+
+        /* ── Stats strip ── */
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 1px;
+            background: var(--border);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            overflow: hidden;
+            margin-bottom: 2rem;
+            animation: fadeUp 0.6s 0.1s ease both;
+        }
+
+        .stat {
+            background: var(--navy-mid);
+            padding: 1.1rem 1.4rem;
+            text-align: center;
+            transition: background 0.2s;
+        }
+
+        .stat:hover { background: rgba(255,255,255,0.06); }
+
+        .stat-val {
+            font-family: 'Instrument Serif', serif;
+            font-size: 1.6rem;
+            color: var(--teal);
+            line-height: 1;
+            margin-bottom: 4px;
+        }
+
+        .stat-lbl {
+            font-size: 0.73rem;
+            color: var(--muted);
+            font-weight: 500;
+            letter-spacing: 0.04em;
+        }
+
+        /* ── Upload card ── */
+        .upload-card {
+            background: var(--navy-mid);
+            border: 1px solid var(--border);
+            border-radius: 18px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            animation: fadeUp 0.6s 0.2s ease both;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .section-label {
+            font-size: 0.72rem;
+            font-weight: 600;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            color: var(--muted);
+            margin-bottom: 1rem;
+        }
+
+        .drop-zone {
+            border: 1.5px dashed rgba(0,198,184,0.25);
+            border-radius: 12px;
+            padding: 2.8rem 1rem;
+            text-align: center;
+            cursor: pointer;
+            transition: border-color 0.2s, background 0.2s;
+            position: relative;
+            background: rgba(0,198,184,0.02);
+        }
+
+        .drop-zone:hover, .drop-zone.dragover {
+            border-color: var(--teal);
+            background: var(--teal-glow);
+        }
+
+        .drop-zone input {
+            position: absolute; inset: 0;
+            opacity: 0; cursor: pointer;
+            width: 100%; height: 100%;
+        }
+
+        .drop-icon-ring {
+            width: 56px; height: 56px;
+            border-radius: 50%;
+            border: 1px solid var(--teal-line);
+            background: var(--teal-glow);
+            display: flex; align-items: center; justify-content: center;
+            margin: 0 auto 1rem;
+        }
+
+        .drop-primary { font-size: 0.95rem; font-weight: 500; color: var(--off); }
+        .drop-hint    { font-size: 0.78rem; color: var(--muted); margin-top: 4px; }
+        #file-name    { margin-top: 0.7rem; font-size: 0.82rem; color: var(--teal); font-weight: 500; min-height: 1.1em; }
+
+        /* ── Predict button ── */
+        .btn-predict {
+            margin-top: 1.2rem;
+            width: 100%;
+            background: var(--teal);
+            color: var(--navy);
+            border: none;
+            padding: 14px;
+            border-radius: 10px;
+            font-family: 'Figtree', sans-serif;
+            font-size: 0.95rem;
+            font-weight: 700;
+            cursor: pointer;
+            display: flex; align-items: center; justify-content: center; gap: 8px;
+            transition: background 0.2s, transform 0.1s, box-shadow 0.2s;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn-predict::after {
+            content: '';
+            position: absolute; inset: 0;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.15), transparent);
+            transform: translateX(-100%);
+            transition: transform 0.5s;
+        }
+
+        .btn-predict:hover::after { transform: translateX(100%); }
+        .btn-predict:hover        { background: var(--teal-dim); box-shadow: 0 0 24px rgba(0,198,184,0.3); }
+        .btn-predict:active       { transform: scale(0.99); }
+        .btn-predict:disabled     { background: var(--navy-soft); color: var(--muted); cursor: not-allowed; box-shadow: none; }
+
+        /* ── Spinner ── */
+        .spinner {
+            width: 16px; height: 16px;
+            border: 2px solid rgba(10,22,40,0.3);
+            border-top-color: var(--navy);
+            border-radius: 50%;
+            animation: spin 0.7s linear infinite;
+            display: none;
+        }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* ── Flash ── */
+        .flash {
+            padding: 12px 16px;
+            border-radius: 10px;
+            font-size: 0.87rem;
+            margin-bottom: 1.5rem;
+            border-left: 3px solid var(--red);
+            background: var(--red-soft);
+            color: #e8a89e;
+            display: none;
+        }
+
+        /* ── Results ── */
+        #resultsSection { display: none; }
+
+        .verdict {
+            border-radius: 14px;
+            padding: 1.5rem 1.8rem;
+            display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+            margin-bottom: 1.4rem;
+            position: relative; overflow: hidden;
+        }
+
+        .verdict.pneumonia {
+            background: var(--red-soft);
+            border: 1px solid rgba(192,103,90,0.3);
+        }
+
+        .verdict.normal {
+            background: var(--green-soft);
+            border: 1px solid rgba(34,211,165,0.3);
+        }
+
+        .verdict-left { display: flex; align-items: center; gap: 14px; }
+
+        .verdict-icon {
+            width: 48px; height: 48px; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .verdict.pneumonia .verdict-icon { background: rgba(192,103,90,0.2); }
+        .verdict.normal    .verdict-icon { background: rgba(34,211,165,0.2); }
+
+        .verdict-label {
+            font-family: 'Instrument Serif', serif;
+            font-size: 1.5rem;
+            line-height: 1;
+        }
+
+        .verdict.pneumonia .verdict-label { color: var(--red); }
+        .verdict.normal    .verdict-label { color: var(--green); }
+
+        .verdict-sub { font-size: 0.82rem; color: var(--muted); margin-top: 4px; }
+
+        .conf-pill {
+            font-size: 1rem; font-weight: 700;
+            padding: 8px 18px; border-radius: 20px;
+            white-space: nowrap;
+        }
+
+        .verdict.pneumonia .conf-pill { background: rgba(192,103,90,0.2); color: #e8a89e; }
+        .verdict.normal    .conf-pill { background: rgba(34,211,165,0.2); color: var(--green); }
+
+        @keyframes scanLine {
+            from { top: 0; }
+            to   { top: 100%; }
+        }
+
+        .verdict::after {
+            content: '';
+            position: absolute; left: 0; right: 0;
+            height: 1px; background: rgba(255,255,255,0.08);
+            animation: scanLine 1.5s ease-out forwards;
+        }
+
+        /* ── Severity Level Block ── */
+        .severity-block {
+            background: var(--navy-mid);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 1.4rem 1.6rem;
+            margin-bottom: 1.4rem;
+            animation: fadeUp 0.5s ease both;
+        }
+
+        .severity-title-row {
+            display: flex; align-items: center; justify-content: space-between;
+            margin-bottom: 1rem;
+        }
+
+        .severity-title {
+            font-size: 0.72rem;
+            font-weight: 600;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            color: var(--muted);
+        }
+
+        .severity-badge {
+            font-size: 0.78rem;
+            font-weight: 600;
+            padding: 3px 12px;
+            border-radius: 20px;
+        }
+
+        .severity-badge.mild     { background: var(--amber-soft);  color: var(--amber); border: 1px solid rgba(200,168,112,0.3); }
+        .severity-badge.moderate { background: var(--orange-soft); color: var(--orange); border: 1px solid rgba(212,132,90,0.3); }
+        .severity-badge.severe   { background: var(--red-soft);    color: var(--red);    border: 1px solid rgba(192,103,90,0.3); }
+        .severity-badge.normal   { background: var(--green-soft);  color: var(--green);  border: 1px solid rgba(90,170,140,0.3); }
+
+        .severity-track {
+            height: 8px;
+            background: rgba(255,255,255,0.06);
+            border-radius: 99px;
+            overflow: hidden;
+            margin-bottom: 8px;
+        }
+
+        .severity-fill {
+            height: 100%;
+            border-radius: 99px;
+            transition: width 0.9s cubic-bezier(0.22,1,0.36,1);
+        }
+
+        .severity-labels {
+            display: flex; justify-content: space-between;
+            font-size: 0.68rem; color: var(--muted);
+            letter-spacing: 0.04em;
+        }
+
+        .severity-detail-grid {
+            display: grid; grid-template-columns: repeat(3,1fr);
+            gap: 1px; background: var(--border);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            overflow: hidden;
+            margin-top: 1rem;
+        }
+
+        .sev-detail-cell {
+            background: var(--navy);
+            padding: 0.8rem 1rem;
+        }
+
+        .sev-detail-label {
+            font-size: 0.68rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.07em;
+            color: var(--muted);
+            margin-bottom: 4px;
+        }
+
+        .sev-detail-value {
+            font-family: 'Instrument Serif', serif;
+            font-size: 1.1rem;
+            line-height: 1.2;
+        }
+
+        /* ── Image grid ── */
+        .img-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.2rem;
+            margin-bottom: 1.2rem;
+        }
+
+        .img-card {
+            background: var(--navy-mid);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            overflow: hidden;
+        }
+
+        .img-card-header {
+            padding: 11px 15px;
+            border-bottom: 1px solid var(--border);
+            font-size: 0.72rem;
+            font-weight: 600;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: var(--muted);
+            display: flex; align-items: center; gap: 6px;
+        }
+
+        .img-card-header span {
+            width: 6px; height: 6px;
+            border-radius: 50%;
+            background: var(--teal);
+            animation: blink 2s ease-in-out infinite;
+        }
+
+        .img-card img { width: 100%; display: block; object-fit: cover; }
+
+        /* ── Disclaimer ── */
+        .disclaimer {
+            background: rgba(255,196,0,0.06);
+            border: 1px solid rgba(255,196,0,0.2);
+            border-radius: 10px;
+            padding: 12px 16px;
+            font-size: 0.79rem;
+            color: #9a8f6e;
+            display: flex; gap: 10px; align-items: flex-start;
+            line-height: 1.55;
+        }
+
+        /* ── Footer ── */
+        footer {
+            position: relative; z-index: 1;
+            text-align: center;
+            font-size: 0.75rem;
+            color: var(--muted);
+            padding: 1.5rem;
+            border-top: 1px solid var(--border);
+        }
+
+        @media (max-width: 580px) {
+            .stats    { grid-template-columns: 1fr 1fr; }
+            .img-grid { grid-template-columns: 1fr; }
+            .verdict  { flex-direction: column; align-items: flex-start; }
+            header    { padding: 0 1rem; }
+            .ecg-wrap { display: none; }
+            .severity-detail-grid { grid-template-columns: 1fr; }
+        }
+
+        /* ── Patient Details Card ── */
+        .patient-card-form {
+            background: var(--navy-mid);
+            border: 1px solid var(--border);
+            border-radius: 18px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            animation: fadeUp 0.6s 0.15s ease both;
+        }
+
+        .patient-form-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+            margin-top: 1.2rem;
+        }
+
+        .patient-form-grid .full { grid-column: 1 / -1; }
+
+        .pf-field label {
+            display: block;
+            font-size: 0.75rem;
+            font-weight: 500;
+            color: var(--muted);
+            margin-bottom: 0.4rem;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+        }
+
+        .pf-field input, .pf-field select, .pf-field textarea {
+            width: 100%;
+            background: rgba(255,255,255,0.04);
+            border: 1px solid var(--border);
+            border-radius: 9px;
+            padding: 0.65rem 0.85rem;
+            font-family: 'Figtree', sans-serif;
+            font-size: 0.87rem;
+            color: var(--white);
+            outline: none;
+            transition: border-color 0.2s, box-shadow 0.2s;
+            resize: vertical;
+        }
+
+        .pf-field input::placeholder,
+        .pf-field textarea::placeholder { color: rgba(122,132,153,0.5); }
+
+        .pf-field input:focus, .pf-field select:focus, .pf-field textarea:focus {
+            border-color: var(--teal-line);
+            box-shadow: 0 0 0 3px rgba(91,143,168,0.1);
+        }
+
+        .pf-field select option { background: var(--navy-mid); }
+
+        /* ── Hospital Recommendations ── */
+        .hospital-section {
+            margin-top: 1.5rem;
+            animation: fadeUp 0.5s ease both;
+        }
+
+        .hospital-section .section-label { margin-bottom: 1rem; }
+
+        .hospital-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.85rem;
+        }
+
+        .hospital-card {
+            background: var(--navy-mid);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 1.1rem 1.2rem;
+            transition: border-color 0.2s, transform 0.2s;
+            cursor: default;
+        }
+
+        .hospital-card:hover {
+            border-color: var(--teal-line);
+            transform: translateY(-2px);
+        }
+
+        .hospital-card-top {
+            display: flex; align-items: flex-start; justify-content: space-between;
+            margin-bottom: 0.5rem;
+        }
+
+        .hospital-name {
+            font-size: 0.88rem;
+            font-weight: 600;
+            color: var(--white);
+            line-height: 1.3;
+        }
+
+        .hospital-dist {
+            font-size: 0.72rem;
+            color: var(--teal);
+            background: var(--teal-glow);
+            border: 1px solid var(--teal-line);
+            border-radius: 20px;
+            padding: 2px 8px;
+            white-space: nowrap;
+            margin-left: 6px;
+            flex-shrink: 0;
+        }
+
+        .hospital-type {
+            font-size: 0.72rem;
+            color: var(--muted);
+            margin-bottom: 0.5rem;
+        }
+
+        .hospital-meta {
+            display: flex; gap: 12px;
+            font-size: 0.73rem;
+            color: var(--muted);
+        }
+
+        .hospital-meta span {
+            display: flex; align-items: center; gap: 4px;
+        }
+
+        .hosp-rating { color: #c8a870; }
+
+        /* ── Patient Report Card ── */
+        .report-section {
+            margin-top: 1.5rem;
+            animation: fadeUp 0.5s ease both;
+        }
+
+        .report-card {
+            background: #ffffff;
+            border-radius: 14px;
+            overflow: hidden;
+            box-shadow: 0 12px 40px rgba(0,0,0,0.35);
+            color: #1a1f2e;
+            font-family: 'Figtree', sans-serif;
+        }
+
+        .report-header {
+            background: #1a1f2e;
+            padding: 1.1rem 1.4rem;
+            display: flex; align-items: center; justify-content: space-between;
+        }
+
+        .report-logo {
+            display: flex; align-items: center; gap: 8px;
+            font-family: 'Instrument Serif', serif;
+            font-size: 1.15rem;
+            color: #f0f2f5;
+        }
+
+        .report-logo-dot {
+            width: 28px; height: 28px;
+            background: rgba(91,143,168,0.2);
+            border: 1px solid rgba(91,143,168,0.4);
+            border-radius: 7px;
+            display: flex; align-items: center; justify-content: center;
+        }
+
+        .report-title-block { text-align: right; }
+        .report-title { font-size: 0.7rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #5b8fa8; }
+        .report-subtitle { font-size: 0.68rem; color: rgba(240,242,245,0.5); margin-top: 2px; }
+
+        .report-body { padding: 1.3rem 1.4rem; }
+
+        .report-patient-row {
+            display: flex; gap: 2rem;
+            margin-bottom: 1rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid #e8eaed;
+            flex-wrap: wrap;
+        }
+
+        .report-field { flex: 1; min-width: 100px; }
+        .report-field-label { font-size: 0.65rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.07em; color: #7a8499; margin-bottom: 3px; }
+        .report-field-value { font-size: 0.88rem; font-weight: 500; color: #1a1f2e; }
+
+        .report-verdict-band {
+            display: flex; align-items: center; gap: 12px;
+            padding: 0.8rem 1rem;
+            border-radius: 10px;
+            margin-bottom: 1rem;
+        }
+
+        .report-verdict-band.pneumonia { background: rgba(192,103,90,0.1); border: 1px solid rgba(192,103,90,0.25); }
+        .report-verdict-band.normal    { background: rgba(90,170,140,0.1); border: 1px solid rgba(90,170,140,0.25); }
+
+        .report-verdict-text { font-size: 0.95rem; font-weight: 600; color: #1a1f2e; }
+        .report-verdict-sub  { font-size: 0.75rem; color: #7a8499; margin-top: 1px; }
+        .report-verdict-conf { margin-left: auto; font-size: 0.78rem; font-weight: 600; color: #5b8fa8; background: rgba(91,143,168,0.1); border: 1px solid rgba(91,143,168,0.2); padding: 3px 10px; border-radius: 20px; }
+
+        /* Severity in report */
+        .report-severity-row {
+            display: flex; gap: 1rem; flex-wrap: wrap;
+            margin-bottom: 1rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid #e8eaed;
+        }
+
+        .report-sev-cell { flex: 1; min-width: 100px; }
+        .report-sev-label { font-size: 0.65rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.07em; color: #7a8499; margin-bottom: 4px; }
+
+        .report-sev-badge {
+            display: inline-block;
+            font-size: 0.78rem; font-weight: 600;
+            padding: 2px 10px; border-radius: 12px;
+        }
+
+        .report-sev-badge.normal   { background: rgba(90,170,140,0.15); color: #3a7a61; border: 1px solid rgba(90,170,140,0.3); }
+        .report-sev-badge.mild     { background: rgba(200,168,112,0.15); color: #7a5c28; border: 1px solid rgba(200,168,112,0.3); }
+        .report-sev-badge.moderate { background: rgba(212,132,90,0.15);  color: #7a4828; border: 1px solid rgba(212,132,90,0.3); }
+        .report-sev-badge.severe   { background: rgba(192,103,90,0.15);  color: #7a3028; border: 1px solid rgba(192,103,90,0.3); }
+
+        .report-sev-track {
+            height: 6px; background: #e8eaed; border-radius: 99px; overflow: hidden; margin-top: 6px;
+        }
+
+        .report-sev-fill { height: 100%; border-radius: 99px; }
+
+        .report-hosp-ref { margin-bottom: 1rem; }
+        .report-hosp-label { font-size: 0.65rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.07em; color: #7a8499; margin-bottom: 0.5rem; }
+        .report-hosp-list { display: flex; flex-direction: column; gap: 6px; }
+        .report-hosp-item { display: flex; align-items: center; gap: 8px; font-size: 0.82rem; color: #1a1f2e; }
+        .report-hosp-item::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: #5b8fa8; flex-shrink: 0; }
+
+        .report-vaccinations { padding-top: 0.8rem; border-top: 1px solid #e8eaed; }
+        .report-vax-label { font-size: 0.65rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.07em; color: #7a8499; margin-bottom: 0.5rem; }
+        .report-vax-row { display: flex; gap: 0.7rem; flex-wrap: wrap; }
+        .report-vax-item { display: flex; align-items: center; gap: 5px; font-size: 0.78rem; color: #3a4258; }
+        .report-vax-item .vax-check { width: 14px; height: 14px; border: 1.5px solid #b0b8c8; border-radius: 3px; flex-shrink: 0; }
+
+        .report-footer { background: #f4f5f8; padding: 0.7rem 1.4rem; display: flex; align-items: center; justify-content: space-between; }
+        .report-date, .report-id { font-size: 0.7rem; color: #7a8499; }
+        .report-id { font-family: monospace; }
+
+        .print-btn {
+            display: flex; align-items: center; gap: 7px;
+            background: var(--teal-glow);
+            border: 1px solid var(--teal-line);
+            border-radius: 8px;
+            padding: 0.5rem 1rem;
+            font-family: 'Figtree', sans-serif;
+            font-size: 0.82rem;
+            font-weight: 500;
+            color: var(--teal);
+            cursor: pointer;
+            transition: background 0.2s;
+            margin-top: 0.75rem;
+        }
+
+        .print-btn:hover { background: rgba(91,143,168,0.2); }
+
+        @media (max-width: 580px) {
+            .hospital-grid { grid-template-columns: 1fr; }
+            .patient-form-grid { grid-template-columns: 1fr; }
+            .report-patient-row { flex-wrap: wrap; gap: 0.8rem; }
+        }
+
+        /* ── Login Overlay ── */
+        #loginOverlay {
+            position: fixed;
+            inset: 0;
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--navy);
+            animation: fadeIn 0.4s ease both;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to   { opacity: 1; }
+        }
+
+        .login-card {
+            position: relative; z-index: 1;
+            width: 100%;
+            max-width: 420px;
+            margin: 1rem;
+            background: var(--navy-mid);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 2.5rem 2rem;
+            animation: slideUp 0.5s cubic-bezier(0.22,1,0.36,1) both;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+        }
+
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(30px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+
+        .login-brand {
+            display: flex; align-items: center; justify-content: center; gap: 10px;
+            font-family: 'Instrument Serif', serif;
+            font-size: 1.5rem;
+            letter-spacing: -0.01em;
+            margin-bottom: 0.4rem;
+        }
+
+        .login-brand-dot {
+            width: 36px; height: 36px;
+            background: var(--teal-glow);
+            border: 1px solid var(--teal-line);
+            border-radius: 10px;
+            display: flex; align-items: center; justify-content: center;
+        }
+
+        .login-subtitle {
+            text-align: center;
+            color: var(--muted);
+            font-size: 0.85rem;
+            margin-bottom: 1.8rem;
+            line-height: 1.5;
+        }
+
+        .login-tag {
+            display: flex; align-items: center; justify-content: center; gap: 6px;
+            font-size: 0.7rem; font-weight: 600; letter-spacing: 0.1em;
+            text-transform: uppercase; color: var(--teal);
+            margin-bottom: 1.4rem;
+        }
+
+        .login-tag span { width: 5px; height: 5px; border-radius: 50%; background: var(--teal); }
+
+        .login-field { margin-bottom: 1rem; }
+
+        .login-field label {
+            display: block;
+            font-size: 0.78rem; font-weight: 500; color: var(--muted);
+            margin-bottom: 0.45rem; letter-spacing: 0.04em;
+        }
+
+        .login-input-wrap { position: relative; }
+
+        .login-input-wrap svg { position: absolute; left: 13px; top: 50%; transform: translateY(-50%); pointer-events: none; opacity: 0.4; }
+
+        .login-input-wrap input {
+            width: 100%;
+            background: rgba(255,255,255,0.04);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 0.72rem 0.9rem 0.72rem 2.5rem;
+            font-family: 'Figtree', sans-serif;
+            font-size: 0.88rem;
+            color: var(--white);
+            outline: none;
+            transition: border-color 0.2s, background 0.2s, box-shadow 0.2s;
+        }
+
+        .login-input-wrap input::placeholder { color: rgba(122,155,181,0.45); }
+
+        .login-input-wrap input:focus {
+            border-color: var(--teal-line);
+            background: rgba(0,198,184,0.04);
+            box-shadow: 0 0 0 3px rgba(0,198,184,0.08);
+        }
+
+        .login-eye {
+            position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
+            cursor: pointer; opacity: 0.4; transition: opacity 0.2s;
+            background: none; border: none; padding: 0; color: var(--white);
+            display: flex; align-items: center;
+        }
+
+        .login-eye:hover { opacity: 0.8; }
+
+        .login-row {
+            display: flex; align-items: center; justify-content: space-between;
+            margin-bottom: 1.4rem;
+        }
+
+        .login-check {
+            display: flex; align-items: center; gap: 7px;
+            font-size: 0.8rem; color: var(--muted); cursor: pointer; user-select: none;
+        }
+
+        .login-check input[type="checkbox"] { width: 15px; height: 15px; accent-color: var(--teal); cursor: pointer; }
+
+        .login-forgot { font-size: 0.8rem; color: var(--teal); text-decoration: none; opacity: 0.85; transition: opacity 0.2s; }
+        .login-forgot:hover { opacity: 1; text-decoration: underline; }
+
+        .login-btn {
+            width: 100%;
+            background: var(--teal);
+            color: var(--navy);
+            border: none; border-radius: 10px;
+            padding: 0.78rem;
+            font-family: 'Figtree', sans-serif;
+            font-size: 0.9rem; font-weight: 600;
+            cursor: pointer;
+            display: flex; align-items: center; justify-content: center; gap: 8px;
+            transition: background 0.2s, transform 0.15s, box-shadow 0.2s;
+            letter-spacing: 0.02em;
+        }
+
+        .login-btn:hover { background: #00e5d5; box-shadow: 0 8px 24px rgba(0,198,184,0.25); transform: translateY(-1px); }
+        .login-btn:active { transform: translateY(0); }
+
+        .login-btn .l-spinner {
+            display: none; width: 16px; height: 16px;
+            border: 2px solid rgba(10,22,40,0.3); border-top-color: var(--navy);
+            border-radius: 50%; animation: spin 0.7s linear infinite;
+        }
+
+        .login-error {
+            display: none;
+            background: rgba(192,103,90,0.1); border: 1px solid rgba(192,103,90,0.25);
+            border-radius: 8px; padding: 0.6rem 0.9rem;
+            font-size: 0.82rem; color: #c0675a; margin-bottom: 1rem;
+            align-items: center; gap: 8px;
+        }
+
+        .login-divider {
+            display: flex; align-items: center; gap: 12px;
+            margin: 1.4rem 0; color: var(--muted); font-size: 0.75rem;
+        }
+
+        .login-divider::before, .login-divider::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+        .login-signup { text-align: center; margin-top: 1.5rem; font-size: 0.82rem; color: var(--muted); }
+        .login-signup a { color: var(--teal); text-decoration: none; font-weight: 600; }
+        .login-signup a:hover { text-decoration: underline; }
+
+        #loginOverlay.hide { animation: fadeOut 0.4s ease forwards; pointer-events: none; }
+
+        @keyframes fadeOut { to { opacity: 0; } }
+
+        .header-login-btn {
+            display: flex; align-items: center; gap: 7px;
+            background: transparent;
+            border: 1px solid var(--teal-line); border-radius: 8px;
+            padding: 0.42rem 0.9rem;
+            font-family: 'Figtree', sans-serif;
+            font-size: 0.8rem; font-weight: 500; color: var(--teal);
+            cursor: pointer; transition: background 0.2s, box-shadow 0.2s;
+        }
+
+        .header-login-btn:hover { background: var(--teal-glow); box-shadow: 0 0 12px rgba(0,198,184,0.15); }
+
+        .header-user {
+            display: none; align-items: center; gap: 8px;
+            font-size: 0.82rem; color: var(--muted);
+        }
+
+        .header-avatar {
+            width: 30px; height: 30px;
+            background: var(--teal-glow); border: 1px solid var(--teal-line);
+            border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 0.75rem; font-weight: 600; color: var(--teal);
+        }
+    </style>
+</head>
+<body>
+
+<!-- ── Login Overlay ── -->
+<div id="loginOverlay">
+    <div class="login-card">
+        <div class="login-brand">
+            <div class="login-brand-dot">
+                <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+                    <path d="M9 3v5M9 3C7.5 3 5 4.8 5 8v5a4 4 0 008 0V8c0-3.2-2.5-5-4-5z" stroke="#5b8fa8" stroke-width="1.5" stroke-linecap="round"/>
+                    <circle cx="5" cy="13" r="1" fill="#5b8fa8"/>
+                    <circle cx="13" cy="13" r="1" fill="#5b8fa8"/>
+                </svg>
+            </div>
+            PneumoScan
+        </div>
+        <p class="login-subtitle">Sign in to access AI-powered<br>pneumonia detection</p>
+
+        <div class="login-tag">
+            <span></span> Secure Medical Portal
+        </div>
+
+        <div class="login-error" id="loginError">
+            <svg width="14" height="14" fill="none" viewBox="0 0 14 14"><circle cx="7" cy="7" r="6" stroke="#c0675a" stroke-width="1.3"/><path d="M7 4v3.5M7 9.5v.5" stroke="#c0675a" stroke-width="1.3" stroke-linecap="round"/></svg>
+            <span id="loginErrorText">Invalid email or password.</span>
+        </div>
+
+        <div class="login-field">
+            <label>Email Address</label>
+            <div class="login-input-wrap">
+                <svg width="15" height="15" fill="none" viewBox="0 0 15 15">
+                    <rect x="1.5" y="3" width="12" height="9" rx="2" stroke="#7a9bb5" stroke-width="1.3"/>
+                    <path d="M1.5 5.5l6 4 6-4" stroke="#7a9bb5" stroke-width="1.3" stroke-linecap="round"/>
+                </svg>
+                <input type="email" id="loginEmail" placeholder="doctor@hospital.com" autocomplete="email">
+            </div>
+        </div>
+
+        <div class="login-field">
+            <label>Password</label>
+            <div class="login-input-wrap">
+                <svg width="15" height="15" fill="none" viewBox="0 0 15 15">
+                    <rect x="3" y="6.5" width="9" height="7" rx="1.5" stroke="#7a9bb5" stroke-width="1.3"/>
+                    <path d="M5 6.5V4.5a2.5 2.5 0 015 0v2" stroke="#7a9bb5" stroke-width="1.3" stroke-linecap="round"/>
+                    <circle cx="7.5" cy="10" r="1" fill="#7a9bb5"/>
+                </svg>
+                <input type="password" id="loginPassword" placeholder="Enter your password" autocomplete="current-password">
+                <button class="login-eye" id="eyeBtn" onclick="togglePwd()" type="button" title="Show/hide password">
+                    <svg id="eyeIcon" width="16" height="16" fill="none" viewBox="0 0 16 16">
+                        <path d="M1 8s2.5-5 7-5 7 5 7 5-2.5 5-7 5-7-5-7-5z" stroke="currentColor" stroke-width="1.3"/>
+                        <circle cx="8" cy="8" r="2" stroke="currentColor" stroke-width="1.3"/>
+                    </svg>
+                </button>
+            </div>
+        </div>
+
+        <div class="login-row">
+            <label class="login-check">
+                <input type="checkbox" id="rememberMe"> Remember me
+            </label>
+            <a href="#" class="login-forgot">Forgot password?</a>
+        </div>
+
+        <button class="login-btn" id="loginBtn" onclick="doLogin()">
+            <div class="l-spinner" id="loginSpinner"></div>
+            <svg id="loginBtnIcon" width="16" height="16" fill="none" viewBox="0 0 16 16">
+                <path d="M6 3H3a1 1 0 00-1 1v8a1 1 0 001 1h3M10 11l3-3-3-3M13 8H6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            Sign In
+        </button>
+
+        <div class="login-divider">or continue with demo</div>
+
+        <button class="login-btn" style="background:var(--surface);color:var(--white);border:1px solid var(--border);" onclick="doDemo()" type="button">
+            <svg width="16" height="16" fill="none" viewBox="0 0 16 16">
+                <path d="M8 2a6 6 0 110 12A6 6 0 018 2z" stroke="#5b8fa8" stroke-width="1.3"/>
+                <path d="M8 5v3l2 2" stroke="#5b8fa8" stroke-width="1.3" stroke-linecap="round"/>
+            </svg>
+            Use Demo Account
+        </button>
+
+        <p class="login-signup">Don't have an account? <a href="#">Request Access</a></p>
+    </div>
+</div>
+
+<header>
+    <div class="logo">
+        <div class="logo-dot">
+            <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+                <path d="M9 3v5M9 3C7.5 3 5 4.8 5 8v5a4 4 0 008 0V8c0-3.2-2.5-5-4-5z" stroke="#5b8fa8" stroke-width="1.5" stroke-linecap="round"/>
+                <circle cx="5" cy="13" r="1" fill="#5b8fa8"/>
+                <circle cx="13" cy="13" r="1" fill="#5b8fa8"/>
+            </svg>
+        </div>
+        PneumoScan
+    </div>
+    <div class="ecg-wrap">
+        <div class="ecg-line">
+            <svg width="240" height="28" viewBox="0 0 240 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <polyline points="0,14 20,14 28,14 32,4 36,24 40,14 48,14 60,14 64,14 68,4 72,24 76,14 84,14 96,14 100,14 104,4 108,24 112,14 120,14 132,14 136,14 140,4 144,24 148,14 156,14 168,14 172,14 176,4 180,24 184,14 192,14 204,14 208,14 212,4 216,24 220,14 228,14 240,14"
+                    stroke="#5b8fa8" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round" opacity="0.6"/>
+            </svg>
+        </div>
+        <div class="status-dot"></div>
+        <span class="status-label">System Online</span>
+        <div style="width:1px;height:18px;background:var(--border);margin:0 6px;"></div>
+        <div class="header-user" id="headerUser">
+            <div class="header-avatar" id="headerAvatar">–</div>
+            <span id="headerName" style="color:var(--off);font-size:0.82rem;"></span>
+            <button onclick="doLogout()" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:0.75rem;padding:3px 6px;border-radius:5px;transition:color 0.2s;" onmouseover="this.style.color='#c0675a'" onmouseout="this.style.color='var(--muted)'">Sign out</button>
+        </div>
+    </div>
+</header>
+
+<main>
+    <div class="hero">
+        <div class="hero-tag">
+            <span style="width:6px;height:6px;border-radius:50%;background:var(--teal);display:inline-block;"></span>
+            AI-Powered Radiology
+        </div>
+        <h1>Detect <em>Pneumonia</em><br>from Chest X-Rays</h1>
+        <p>Upload a chest radiograph and receive an instant AI-assisted screening result with severity grading, Grad-CAM heatmap visualisation, and a printable patient referral card.</p>
+    </div>
+
+    <!-- Updated stats: 4 columns with new text -->
+    <div class="stats">
+        <div class="stat">
+            <div class="stat-val">ResNet50</div>
+            <div class="stat-lbl">Model architecture</div>
+        </div>
+        <div class="stat">
+            <div class="stat-val">97.3%</div>
+            <div class="stat-lbl">Detection accuracy</div>
+        </div>
+        <div class="stat">
+            <div class="stat-val">Grad-CAM</div>
+            <div class="stat-lbl">Region heatmap</div>
+        </div>
+        <div class="stat">
+            <div class="stat-val">4-level</div>
+            <div class="stat-lbl">Severity grading</div>
+        </div>
+    </div>
+
+    <div class="flash" id="flashMsg"></div>
+
+    <!-- Patient Details Form -->
+    <div class="patient-card-form" id="patientForm">
+        <div class="section-label">Patient Details</div>
+        <div class="patient-form-grid">
+            <div class="pf-field">
+                <label>Full Name *</label>
+                <input type="text" id="ptName" placeholder="e.g. Ravi Kumar">
+            </div>
+            <div class="pf-field">
+                <label>Age *</label>
+                <input type="number" id="ptAge" placeholder="e.g. 45" min="1" max="120">
+            </div>
+            <div class="pf-field">
+                <label>Gender</label>
+                <select id="ptGender">
+                    <option value="">Select</option>
+                    <option>Male</option>
+                    <option>Female</option>
+                    <option>Other</option>
+                </select>
+            </div>
+            <div class="pf-field">
+                <label>Phone</label>
+                <input type="tel" id="ptPhone" placeholder="+91 98765 43210">
+            </div>
+            <div class="pf-field">
+                <label>City / Location *</label>
+                <input type="text" id="ptCity" placeholder="e.g. Bengaluru, Karnataka">
+            </div>
+            <div class="pf-field">
+                <label>Referring Physician</label>
+                <input type="text" id="ptPhysician" placeholder="e.g. Dr. Anita Sharma">
+            </div>
+            <div class="pf-field">
+                <label>Scan Date</label>
+                <input type="date" id="ptScanDate">
+            </div>
+            <div class="pf-field">
+                <label>Blood Group</label>
+                <select id="ptBlood">
+                    <option value="">Select</option>
+                    <option>A+</option><option>A−</option>
+                    <option>B+</option><option>B−</option>
+                    <option>O+</option><option>O−</option>
+                    <option>AB+</option><option>AB−</option>
+                </select>
+            </div>
+            <div class="pf-field full">
+                <label>Known Conditions (optional)</label>
+                <input type="text" id="ptConditions" placeholder="e.g. Diabetes, Hypertension, Asthma">
+            </div>
+            <div class="pf-field full">
+                <label>Clinical Notes (optional)</label>
+                <textarea id="ptNotes" rows="2" placeholder="Symptoms, onset, relevant history…"></textarea>
+            </div>
+        </div>
+    </div>
+
+    <div class="upload-card">
+        <div class="section-label">Upload Chest X-Ray</div>
+        <div class="drop-zone" id="dropZone">
+            <input type="file" accept=".jpg,.jpeg,.png" id="fileInput">
+            <div class="drop-icon-ring">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                    <path d="M12 15V5M8 9l4-4 4 4" stroke="#5b8fa8" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                    <path d="M3 17v1.5A2.5 2.5 0 005.5 21h13a2.5 2.5 0 002.5-2.5V17" stroke="#5b8fa8" stroke-width="1.8" stroke-linecap="round"/>
+                </svg>
+            </div>
+            <div class="drop-primary">Click to select or drag &amp; drop</div>
+            <div class="drop-hint">JPG, JPEG or PNG — max 5 MB</div>
+            <div id="file-name"></div>
+        </div>
+
+        <button class="btn-predict" id="submitBtn" onclick="submitForm()">
+            <div class="spinner" id="spinner"></div>
+            <svg id="btnIcon" width="17" height="17" fill="none" viewBox="0 0 17 17">
+                <circle cx="8.5" cy="8.5" r="7" stroke="currentColor" stroke-width="1.5"/>
+                <path d="M6 8.5h5M9 6.5l2 2-2 2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <span id="btnText">Run Analysis</span>
+        </button>
+    </div>
+
+    <div id="resultsSection">
+
+        <!-- Verdict banner -->
+        <div class="verdict" id="verdictBox">
+            <div class="verdict-left">
+                <div class="verdict-icon" id="verdictIcon"></div>
+                <div>
+                    <div class="verdict-label" id="verdictLabel"></div>
+                    <div class="verdict-sub"   id="verdictSub"></div>
+                </div>
+            </div>
+            <div class="conf-pill" id="confPill"></div>
+        </div>
+
+        <!-- Severity Level Block -->
+        <div class="severity-block" id="severityBlock">
+            <div class="severity-title-row">
+                <div class="severity-title">Pneumonia Severity Level</div>
+                <div class="severity-badge" id="severityBadge"></div>
+            </div>
+            <div class="severity-track">
+                <div class="severity-fill" id="severityFill" style="width:0%"></div>
+            </div>
+            <div class="severity-labels">
+                <span>Normal</span>
+                <span>Mild</span>
+                <span>Moderate</span>
+                <span>Severe</span>
+            </div>
+            <div class="severity-detail-grid">
+                <div class="sev-detail-cell">
+                    <div class="sev-detail-label">Lung Involvement</div>
+                    <div class="sev-detail-value" id="sevInvolvement">—</div>
+                </div>
+                <div class="sev-detail-cell">
+                    <div class="sev-detail-label">Affected Regions</div>
+                    <div class="sev-detail-value" id="sevRegions">—</div>
+                </div>
+                <div class="sev-detail-cell">
+                    <div class="sev-detail-label">Recommended Action</div>
+                    <div class="sev-detail-value" id="sevAction" style="font-size:0.82rem;font-family:'Figtree',sans-serif;line-height:1.4;"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="img-grid" id="imgGrid"></div>
+
+        <div class="disclaimer">
+            <svg width="15" height="15" fill="none" viewBox="0 0 15 15" style="flex-shrink:0;margin-top:1px">
+                <circle cx="7.5" cy="7.5" r="6.5" stroke="#9a8f6e" stroke-width="1.2"/>
+                <path d="M7.5 4.5v3.5M7.5 10v.5" stroke="#9a8f6e" stroke-width="1.2" stroke-linecap="round"/>
+            </svg>
+            <span>For <strong>research and educational use only</strong>. This is not a clinical diagnostic tool. Always consult a qualified radiologist or physician before making any medical decisions.</span>
+        </div>
+
+        <!-- Hospital Recommendations (shown only for pneumonia) -->
+        <div class="hospital-section" id="hospitalSection" style="display:none;">
+            <div class="section-label">Recommended Nearby Hospitals</div>
+            <div class="hospital-grid" id="hospitalGrid"></div>
+        </div>
+
+        <!-- Patient Report Card -->
+        <div class="report-section" id="reportSection" style="display:none;">
+            <div class="section-label" style="margin-bottom:0.8rem;">Patient Referral Card</div>
+            <div class="report-card" id="reportCard"></div>
+            <button class="print-btn" onclick="printCard()">
+                <svg width="14" height="14" fill="none" viewBox="0 0 14 14">
+                    <rect x="2" y="4" width="10" height="7" rx="1.5" stroke="currentColor" stroke-width="1.2"/>
+                    <path d="M4 4V2.5a.5.5 0 01.5-.5h5a.5.5 0 01.5.5V4M4 9h6M4 11h4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
+                </svg>
+                Print / Save as PDF
+            </button>
+        </div>
+    </div>
+</main>
+
+<footer>
+    PneumoScan &nbsp;·&nbsp; FastAI · ResNet50 · Flask · Grad-CAM · 4-Level Severity &nbsp;·&nbsp; Not for clinical use
+</footer>
+
+<script>
+    const fileInput = document.getElementById('fileInput');
+    const fileLabel = document.getElementById('file-name');
+    const zone      = document.getElementById('dropZone');
+    const submitBtn = document.getElementById('submitBtn');
+    const spinner   = document.getElementById('spinner');
+    const btnIcon   = document.getElementById('btnIcon');
+    const btnText   = document.getElementById('btnText');
+    const flashEl   = document.getElementById('flashMsg');
+
+    const ALLOWED = ['image/jpeg', 'image/png'];
+    const MAX_MB  = 5;
+
+    fileInput.addEventListener('change', () => {
+        if (fileInput.files[0]) fileLabel.textContent = fileInput.files[0].name;
+    });
+
+    zone.addEventListener('dragover',  e => { e.preventDefault(); zone.classList.add('dragover'); });
+    zone.addEventListener('dragleave', ()  => zone.classList.remove('dragover'));
+    zone.addEventListener('drop', e => {
+        e.preventDefault();
+        zone.classList.remove('dragover');
+        if (e.dataTransfer.files[0]) {
+            fileInput.files = e.dataTransfer.files;
+            fileLabel.textContent = e.dataTransfer.files[0].name;
+        }
+    });
+
+    function showFlash(msg) {
+        flashEl.textContent = '⚠ ' + msg;
+        flashEl.style.display = 'block';
+        flashEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+
+    function setLoading(on) {
+        submitBtn.disabled    = on;
+        spinner.style.display = on ? 'block' : 'none';
+        btnIcon.style.display = on ? 'none'  : 'block';
+        btnText.textContent   = on ? 'Analysing scan...' : 'Run Analysis';
+    }
+
+    async function submitForm() {
+        flashEl.style.display = 'none';
+
+        const file = fileInput.files[0];
+        if (!file) return showFlash('Please select an X-ray image first.');
+        if (!ALLOWED.includes(file.type)) return showFlash('Only JPG and PNG files are supported.');
+        if (file.size > MAX_MB * 1024 * 1024) return showFlash('File exceeds the 5 MB limit.');
+
+        const fd = new FormData();
+        fd.append('file', file);
+        setLoading(true);
+
+        try {
+            const res  = await fetch('/predict', { method: 'POST', body: fd });
+            const data = await res.json();
+            if (!res.ok || data.error) showFlash(data.error || 'Prediction failed.');
+            else renderResults(data);
+        } catch {
+            showFlash('Could not reach the server. Is Flask running?');
+        } finally {
+            setLoading(false);
+        }
+    }
+
+    /* ── Severity config ── */
+    const SEVERITY_CONFIG = {
+        normal: {
+            label: 'Normal', cls: 'normal',
+            fillPct: '4%', fillColor: '#5aaa8c',
+            involvement: '0%',
+            regions: 'None detected',
+            action: 'No treatment needed. Routine follow-up.'
+        },
+        mild: {
+            label: 'Mild', cls: 'mild',
+            fillPct: '35%', fillColor: '#c8a870',
+            involvement: '15 – 25%',
+            regions: 'Right lower lobe',
+            action: 'Outpatient antibiotics. Rest & hydration.'
+        },
+        moderate: {
+            label: 'Moderate', cls: 'moderate',
+            fillPct: '65%', fillColor: '#d4845a',
+            involvement: '35 – 50%',
+            regions: 'Bilateral lower lobes',
+            action: 'Hospital admission advised. IV antibiotics.'
+        },
+        severe: {
+            label: 'Severe', cls: 'severe',
+            fillPct: '95%', fillColor: '#c0675a',
+            involvement: '> 60%',
+            regions: 'Diffuse bilateral involvement',
+            action: 'ICU admission. Urgent respiratory support.'
+        }
+    };
+
+    function getSeverityKey(confidence, isPneumonia) {
+        if (!isPneumonia) return 'normal';
+        if (confidence >= 90) return 'severe';
+        if (confidence >= 75) return 'moderate';
+        return 'mild';
+    }
+
+    function renderResults(data) {
+        const isPneumonia = data.prediction.toLowerCase() === 'pneumonia';
+        const conf = parseFloat(data.confidence);
+        const sevKey = getSeverityKey(conf, isPneumonia);
+        const sev = SEVERITY_CONFIG[sevKey];
+
+        /* Verdict */
+        document.getElementById('verdictBox').className = 'verdict ' + (isPneumonia ? 'pneumonia' : 'normal');
+        document.getElementById('verdictIcon').innerHTML = isPneumonia
+            ? `<svg width="24" height="24" fill="none" viewBox="0 0 24 24"><path d="M12 5l9 15H3L12 5z" stroke="#c0675a" stroke-width="1.8" stroke-linejoin="round"/><path d="M12 11v4M12 17v.5" stroke="#c0675a" stroke-width="1.8" stroke-linecap="round"/></svg>`
+            : `<svg width="24" height="24" fill="none" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" stroke="#5aaa8c" stroke-width="1.8"/><path d="M8 12l3 3 5-5" stroke="#5aaa8c" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+        document.getElementById('verdictLabel').textContent = data.prediction;
+        document.getElementById('verdictSub').textContent   = isPneumonia
+            ? 'Possible infection indicators detected — consult a physician.'
+            : 'No pneumonia indicators found in this scan.';
+        document.getElementById('confPill').textContent = data.confidence + '% confidence';
+
+        /* Severity */
+        const badge = document.getElementById('severityBadge');
+        badge.textContent = sev.label;
+        badge.className   = 'severity-badge ' + sev.cls;
+
+        const fill = document.getElementById('severityFill');
+        fill.style.background = sev.fillColor;
+        setTimeout(() => { fill.style.width = sev.fillPct; }, 80);
+
+        document.getElementById('sevInvolvement').textContent = sev.involvement;
+        document.getElementById('sevRegions').textContent     = sev.regions;
+        document.getElementById('sevAction').textContent      = sev.action;
+
+        /* Images */
+        const heatmapCard = data.heatmap
+            ? `<div class="img-card"><div class="img-card-header"><span></span>Grad-CAM Heatmap</div><img src="/static/uploads/${data.heatmap}" alt="Heatmap"></div>`
+            : '';
+        document.getElementById('imgGrid').innerHTML = `
+            <div class="img-card"><div class="img-card-header"><span></span>Original X-Ray</div><img src="/static/uploads/${data.image}" alt="X-ray"></div>
+            ${heatmapCard}
+        `;
+
+        /* Hospitals */
+        if (isPneumonia) {
+            renderHospitals();
+        } else {
+            document.getElementById('hospitalSection').style.display = 'none';
+        }
+
+        /* Patient card */
+        renderPatientCard(data, isPneumonia, sev);
+
+        const sec = document.getElementById('resultsSection');
+        sec.style.display = 'block';
+        sec.style.animation = 'fadeUp 0.5s ease both';
+        sec.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    /* ── Hospital data ── */
+    const HOSPITALS_DB = {
+        default: [
+            { name: 'Apollo Hospitals', type: 'Multi-Specialty Hospital', dist: '2.4 km', rating: '4.7', phone: '1066', beds: '400+' },
+            { name: 'Fortis Healthcare', type: 'Pulmonology Center', dist: '3.8 km', rating: '4.5', phone: '1800-111-777', beds: '280+' },
+            { name: 'Manipal Hospital', type: 'Respiratory & Critical Care', dist: '5.1 km', rating: '4.6', phone: '080-2222-4444', beds: '600+' },
+            { name: 'Columbia Asia', type: 'Multi-Specialty Hospital', dist: '6.3 km', rating: '4.3', phone: '080-6165-6060', beds: '200+' },
+        ],
+        mumbai: [
+            { name: 'Lilavati Hospital', type: 'Multi-Specialty Hospital', dist: '1.8 km', rating: '4.8', phone: '022-2675-1000', beds: '323+' },
+            { name: 'Kokilaben Hospital', type: 'Pulmonology & Chest Medicine', dist: '3.2 km', rating: '4.7', phone: '022-3066-5050', beds: '750+' },
+            { name: 'Breach Candy Hospital', type: 'Respiratory Care Unit', dist: '4.5 km', rating: '4.5', phone: '022-2367-2888', beds: '200+' },
+            { name: 'Hinduja Hospital', type: 'Multi-Specialty Hospital', dist: '5.0 km', rating: '4.6', phone: '022-2445-1515', beds: '350+' },
+        ],
+        delhi: [
+            { name: 'AIIMS Delhi', type: 'Government Research Hospital', dist: '2.1 km', rating: '4.9', phone: '011-2659-3300', beds: '2400+' },
+            { name: 'Max Super Speciality', type: 'Pulmonology Center', dist: '4.0 km', rating: '4.6', phone: '011-2651-5050', beds: '500+' },
+            { name: 'Medanta - The Medicity', type: 'Multi-Specialty Hospital', dist: '6.5 km', rating: '4.7', phone: '0124-4141-414', beds: '1200+' },
+            { name: 'Safdarjung Hospital', type: 'Government Hospital', dist: '3.3 km', rating: '4.2', phone: '011-2616-5060', beds: '1500+' },
+        ],
+        chennai: [
+            { name: 'Vijaya Hospital', type: 'Multi-Specialty Hospital', dist: '1.5 km', rating: '4.6', phone: '044-2434-3000', beds: '350+' },
+            { name: 'MIOT International', type: 'Respiratory Medicine', dist: '3.7 km', rating: '4.7', phone: '044-2249-0000', beds: '400+' },
+            { name: 'Apollo Chennai', type: 'Pulmonology Center', dist: '4.9 km', rating: '4.8', phone: '044-2829-0200', beds: '700+' },
+            { name: 'Kauvery Hospital', type: 'Multi-Specialty Hospital', dist: '6.0 km', rating: '4.5', phone: '044-4000-6000', beds: '500+' },
+        ],
+    };
+
+    function getHospitals() {
+        const city = (document.getElementById('ptCity').value || '').toLowerCase();
+        if (city.includes('mumbai') || city.includes('bombay')) return HOSPITALS_DB.mumbai;
+        if (city.includes('delhi') || city.includes('new delhi')) return HOSPITALS_DB.delhi;
+        if (city.includes('chennai') || city.includes('madras')) return HOSPITALS_DB.chennai;
+        return HOSPITALS_DB.default;
+    }
+
+    function renderHospitals() {
+        const hospitals = getHospitals();
+        const grid = document.getElementById('hospitalGrid');
+        grid.innerHTML = hospitals.map(h => `
+            <div class="hospital-card">
+                <div class="hospital-card-top">
+                    <div class="hospital-name">${h.name}</div>
+                    <div class="hospital-dist">${h.dist}</div>
+                </div>
+                <div class="hospital-type">${h.type}</div>
+                <div class="hospital-meta">
+                    <span class="hosp-rating">★ ${h.rating}</span>
+                    <span>📞 ${h.phone}</span>
+                    <span>🛏 ${h.beds} beds</span>
+                </div>
+            </div>
+        `).join('');
+        document.getElementById('hospitalSection').style.display = 'block';
+    }
+
+    function renderPatientCard(data, isPneumonia, sev) {
+        const name       = document.getElementById('ptName').value       || 'N/A';
+        const age        = document.getElementById('ptAge').value        || '—';
+        const gender     = document.getElementById('ptGender').value     || '—';
+        const phone      = document.getElementById('ptPhone').value      || '—';
+        const city       = document.getElementById('ptCity').value       || '—';
+        const physician  = document.getElementById('ptPhysician').value  || '—';
+        const scanDate   = document.getElementById('ptScanDate').value   || '—';
+        const blood      = document.getElementById('ptBlood').value      || '—';
+        const conditions = document.getElementById('ptConditions').value || 'None reported';
+        const notes      = document.getElementById('ptNotes').value      || '—';
+        const hospitals  = isPneumonia ? getHospitals().slice(0, 2) : [];
+        const refId      = 'PS-' + Date.now().toString(36).toUpperCase();
+        const dateStr    = new Date().toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'numeric' });
+        const timeStr    = new Date().toLocaleTimeString('en-IN', { hour:'2-digit', minute:'2-digit' });
+
+        /* Severity fill for report (light theme colors) */
+        const sevColorMap = { normal:'#5aaa8c', mild:'#c8a870', moderate:'#d4845a', severe:'#c0675a' };
+        const sevPctMap   = { normal:'4%', mild:'35%', moderate:'65%', severe:'95%' };
+        const sevKey      = sev.cls;
+        const sevColor    = sevColorMap[sevKey] || '#c0675a';
+        const sevPct      = sevPctMap[sevKey]   || '4%';
+
+        const hospitalsHtml = isPneumonia ? `
+            <div class="report-hosp-ref">
+                <div class="report-hosp-label">Referred to (Nearest Hospitals)</div>
+                <div class="report-hosp-list">
+                    ${hospitals.map(h => `<div class="report-hosp-item">${h.name} — ${h.type} (${h.dist})</div>`).join('')}
+                </div>
+            </div>` : '';
+
+        document.getElementById('reportCard').innerHTML = `
+            <div class="report-header">
+                <div class="report-logo">
+                    <div class="report-logo-dot">
+                        <svg width="14" height="14" viewBox="0 0 18 18" fill="none">
+                            <path d="M9 3v5M9 3C7.5 3 5 4.8 5 8v5a4 4 0 008 0V8c0-3.2-2.5-5-4-5z" stroke="#5b8fa8" stroke-width="1.5" stroke-linecap="round"/>
+                        </svg>
+                    </div>
+                    PneumoScan
+                </div>
+                <div class="report-title-block">
+                    <div class="report-title">AI Screening Report</div>
+                    <div class="report-subtitle">Pneumococcal Pneumonia · Referral Card</div>
+                </div>
+            </div>
+
+            <div class="report-body">
+
+                <!-- Patient info row -->
+                <div class="report-patient-row">
+                    <div class="report-field">
+                        <div class="report-field-label">Patient Name</div>
+                        <div class="report-field-value">${name}</div>
+                    </div>
+                    <div class="report-field">
+                        <div class="report-field-label">Age / Gender</div>
+                        <div class="report-field-value">${age} yrs / ${gender}</div>
+                    </div>
+                    <div class="report-field">
+                        <div class="report-field-label">Blood Group</div>
+                        <div class="report-field-value">${blood}</div>
+                    </div>
+                    <div class="report-field">
+                        <div class="report-field-label">Contact</div>
+                        <div class="report-field-value">${phone}</div>
+                    </div>
+                </div>
+
+                <!-- Second info row -->
+                <div class="report-patient-row">
+                    <div class="report-field">
+                        <div class="report-field-label">Location</div>
+                        <div class="report-field-value">${city}</div>
+                    </div>
+                    <div class="report-field">
+                        <div class="report-field-label">Referring Physician</div>
+                        <div class="report-field-value">${physician}</div>
+                    </div>
+                    <div class="report-field">
+                        <div class="report-field-label">Scan Date</div>
+                        <div class="report-field-value">${scanDate}</div>
+                    </div>
+                    <div class="report-field">
+                        <div class="report-field-label">Known Conditions</div>
+                        <div class="report-field-value" style="font-size:0.82rem;">${conditions}</div>
+                    </div>
+                </div>
+
+                <!-- Verdict band -->
+                <div class="report-verdict-band ${isPneumonia ? 'pneumonia' : 'normal'}">
+                    <div>
+                        <div class="report-verdict-text">
+                            ${isPneumonia ? '⚠ Pneumonia Indicators Detected' : '✓ No Pneumonia Detected'}
+                        </div>
+                        <div class="report-verdict-sub">
+                            ${isPneumonia
+                                ? 'Patient should be referred to a pulmonologist immediately.'
+                                : 'Scan appears normal. Routine follow-up advised.'}
+                        </div>
+                    </div>
+                    <div class="report-verdict-conf">${data.confidence}% confidence</div>
+                </div>
+
+                <!-- Severity row -->
+                <div class="report-severity-row">
+                    <div class="report-sev-cell">
+                        <div class="report-sev-label">Severity Level</div>
+                        <span class="report-sev-badge ${sevKey}">${sev.label}</span>
+                    </div>
+                    <div class="report-sev-cell" style="flex:2;">
+                        <div class="report-sev-label">Severity Meter</div>
+                        <div class="report-sev-track">
+                            <div class="report-sev-fill" style="width:${sevPct};background:${sevColor};"></div>
+                        </div>
+                        <div style="display:flex;justify-content:space-between;font-size:0.62rem;color:#7a8499;margin-top:3px;">
+                            <span>Normal</span><span>Mild</span><span>Moderate</span><span>Severe</span>
+                        </div>
+                    </div>
+                    <div class="report-sev-cell">
+                        <div class="report-sev-label">Lung Involvement</div>
+                        <div style="font-size:0.88rem;font-weight:500;color:#1a1f2e;">${sev.involvement}</div>
+                    </div>
+                    <div class="report-sev-cell">
+                        <div class="report-sev-label">Affected Regions</div>
+                        <div style="font-size:0.82rem;font-weight:500;color:#1a1f2e;">${sev.regions}</div>
+                    </div>
+                </div>
+
+                <!-- Recommended action -->
+                <div class="report-hosp-ref">
+                    <div class="report-hosp-label">Recommended Action</div>
+                    <div style="font-size:0.84rem;color:#1a1f2e;font-weight:500;">${sev.action}</div>
+                </div>
+
+                ${hospitalsHtml}
+
+                <!-- Clinical notes -->
+                <div class="report-hosp-ref" style="margin-bottom:0.8rem;">
+                    <div class="report-hosp-label">Clinical Notes</div>
+                    <div style="font-size:0.82rem;color:#3a4258;">${notes}</div>
+                </div>
+
+                <!-- Vaccinations -->
+                <div class="report-vaccinations">
+                    <div class="report-vax-label">Other Vaccinations Needed (to be completed by physician)</div>
+                    <div class="report-vax-row">
+                        ${['Influenza','COVID-19','RSV','Tdap','Shingles','PCV15'].map(v => `
+                            <div class="report-vax-item">
+                                <div class="vax-check"></div>${v}
+                            </div>`).join('')}
+                    </div>
+                </div>
+            </div>
+
+            <div class="report-footer">
+                <div class="report-date">Generated: ${dateStr} at ${timeStr}</div>
+                <div class="report-id">Ref ID: ${refId}</div>
+            </div>
+        `;
+
+        document.getElementById('reportSection').style.display = 'block';
+    }
+
+    function printCard() {
+        const card = document.getElementById('reportCard').outerHTML;
+        const win = window.open('', '_blank');
+        win.document.write(`<!DOCTYPE html><html><head>
+            <title>PneumoScan Patient Card</title>
+            <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Figtree:wght@300;400;500;600&display=swap" rel="stylesheet">
+            <style>
+                * { box-sizing:border-box; margin:0; padding:0; }
+                body { font-family:'Figtree',sans-serif; background:#f4f5f8; display:flex; justify-content:center; padding:2rem; }
+                .report-card { background:#fff; border-radius:14px; overflow:hidden; box-shadow:0 4px 20px rgba(0,0,0,0.12); max-width:760px; width:100%; }
+                .report-header { background:#1a1f2e; padding:1.1rem 1.4rem; display:flex; align-items:center; justify-content:space-between; }
+                .report-logo { display:flex; align-items:center; gap:8px; font-family:'Instrument Serif',serif; font-size:1.15rem; color:#f0f2f5; }
+                .report-logo-dot { width:28px; height:28px; background:rgba(91,143,168,0.2); border:1px solid rgba(91,143,168,0.4); border-radius:7px; display:flex; align-items:center; justify-content:center; }
+                .report-title-block { text-align:right; }
+                .report-title { font-size:0.7rem; font-weight:600; letter-spacing:0.08em; text-transform:uppercase; color:#5b8fa8; }
+                .report-subtitle { font-size:0.68rem; color:rgba(240,242,245,0.5); margin-top:2px; }
+                .report-body { padding:1.3rem 1.4rem; }
+                .report-patient-row { display:flex; gap:1.5rem; margin-bottom:1rem; padding-bottom:1rem; border-bottom:1px solid #e8eaed; flex-wrap:wrap; }
+                .report-field { flex:1; min-width:100px; }
+                .report-field-label { font-size:0.65rem; font-weight:600; text-transform:uppercase; letter-spacing:0.07em; color:#7a8499; margin-bottom:3px; }
+                .report-field-value { font-size:0.88rem; font-weight:500; color:#1a1f2e; }
+                .report-verdict-band { display:flex; align-items:center; gap:12px; padding:0.8rem 1rem; border-radius:10px; margin-bottom:1rem; }
+                .report-verdict-band.pneumonia { background:rgba(192,103,90,0.1); border:1px solid rgba(192,103,90,0.25); }
+                .report-verdict-band.normal { background:rgba(90,170,140,0.1); border:1px solid rgba(90,170,140,0.25); }
+                .report-verdict-text { font-size:0.95rem; font-weight:600; color:#1a1f2e; }
+                .report-verdict-sub { font-size:0.75rem; color:#7a8499; margin-top:1px; }
+                .report-verdict-conf { margin-left:auto; font-size:0.78rem; font-weight:600; color:#5b8fa8; background:rgba(91,143,168,0.1); border:1px solid rgba(91,143,168,0.2); padding:3px 10px; border-radius:20px; }
+                .report-severity-row { display:flex; gap:1rem; flex-wrap:wrap; margin-bottom:1rem; padding-bottom:1rem; border-bottom:1px solid #e8eaed; }
+                .report-sev-cell { flex:1; min-width:100px; }
+                .report-sev-label { font-size:0.65rem; font-weight:600; text-transform:uppercase; letter-spacing:0.07em; color:#7a8499; margin-bottom:4px; }
+                .report-sev-badge { display:inline-block; font-size:0.78rem; font-weight:600; padding:2px 10px; border-radius:12px; }
+                .report-sev-badge.normal   { background:rgba(90,170,140,0.15); color:#3a7a61; border:1px solid rgba(90,170,140,0.3); }
+                .report-sev-badge.mild     { background:rgba(200,168,112,0.15); color:#7a5c28; border:1px solid rgba(200,168,112,0.3); }
+                .report-sev-badge.moderate { background:rgba(212,132,90,0.15);  color:#7a4828; border:1px solid rgba(212,132,90,0.3); }
+                .report-sev-badge.severe   { background:rgba(192,103,90,0.15);  color:#7a3028; border:1px solid rgba(192,103,90,0.3); }
+                .report-sev-track { height:6px; background:#e8eaed; border-radius:99px; overflow:hidden; margin-top:6px; }
+                .report-sev-fill { height:100%; border-radius:99px; }
+                .report-hosp-ref { margin-bottom:0.8rem; }
+                .report-hosp-label { font-size:0.65rem; font-weight:600; text-transform:uppercase; letter-spacing:0.07em; color:#7a8499; margin-bottom:0.5rem; }
+                .report-hosp-list { display:flex; flex-direction:column; gap:6px; }
+                .report-hosp-item { display:flex; align-items:center; gap:8px; font-size:0.82rem; color:#1a1f2e; }
+                .report-hosp-item::before { content:''; width:6px; height:6px; border-radius:50%; background:#5b8fa8; flex-shrink:0; }
+                .report-vaccinations { padding-top:0.8rem; border-top:1px solid #e8eaed; }
+                .report-vax-label { font-size:0.65rem; font-weight:600; text-transform:uppercase; letter-spacing:0.07em; color:#7a8499; margin-bottom:0.5rem; }
+                .report-vax-row { display:flex; gap:0.7rem; flex-wrap:wrap; }
+                .report-vax-item { display:flex; align-items:center; gap:5px; font-size:0.78rem; color:#3a4258; }
+                .vax-check { width:14px; height:14px; border:1.5px solid #b0b8c8; border-radius:3px; flex-shrink:0; }
+                .report-footer { background:#f4f5f8; padding:0.7rem 1.4rem; display:flex; align-items:center; justify-content:space-between; }
+                .report-date,.report-id { font-size:0.7rem; color:#7a8499; }
+                .report-id { font-family:monospace; }
+                @media print { body { padding:0; } .report-card { box-shadow:none; border-radius:0; } }
+            </style>
+        </head><body>${card}</body></html>`);
+        win.document.close();
+        setTimeout(() => win.print(), 600);
+    }
+</script>
+
+<script>
+    /* ── Login ── */
+    const USERS = [
+        { email: 'demo@pneumoscan.ai', password: 'demo1234', name: 'Demo User' },
+        { email: 'doctor@hospital.com', password: 'password', name: 'Dr. Smith' }
+    ];
+
+    function togglePwd() {
+        const input = document.getElementById('loginPassword');
+        const icon  = document.getElementById('eyeIcon');
+        const show  = input.type === 'password';
+        input.type  = show ? 'text' : 'password';
+        icon.innerHTML = show
+            ? `<path d="M2 2l12 12M6.5 6.8A3 3 0 0110.2 10M1 8s2.5-4 7-4m0 0c.9 0 1.7.2 2.5.5M13 10.5C14.1 9.6 15 8 15 8s-2.5-5-7-5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>`
+            : `<path d="M1 8s2.5-5 7-5 7 5 7 5-2.5 5-7 5-7-5-7-5z" stroke="currentColor" stroke-width="1.3"/><circle cx="8" cy="8" r="2" stroke="currentColor" stroke-width="1.3"/>`;
+    }
+
+    function showLoginError(msg) {
+        const el = document.getElementById('loginError');
+        document.getElementById('loginErrorText').textContent = msg;
+        el.style.display = 'flex';
+    }
+
+    function setLoginLoading(on) {
+        const btn = document.getElementById('loginBtn');
+        document.getElementById('loginSpinner').style.display = on ? 'block' : 'none';
+        document.getElementById('loginBtnIcon').style.display = on ? 'none' : 'block';
+        btn.disabled = on;
+    }
+
+    async function doLogin() {
+        const email = document.getElementById('loginEmail').value.trim();
+        const pwd   = document.getElementById('loginPassword').value;
+        document.getElementById('loginError').style.display = 'none';
+        if (!email) return showLoginError('Please enter your email address.');
+        if (!pwd)   return showLoginError('Please enter your password.');
+        setLoginLoading(true);
+        await new Promise(r => setTimeout(r, 900));
+        setLoginLoading(false);
+        const user = USERS.find(u => u.email === email && u.password === pwd);
+        if (!user) return showLoginError('Invalid email or password. Try demo@pneumoscan.ai / demo1234');
+        loginSuccess(user);
+    }
+
+    function doDemo() {
+        document.getElementById('loginEmail').value    = 'demo@pneumoscan.ai';
+        document.getElementById('loginPassword').value = 'demo1234';
+        document.getElementById('loginError').style.display = 'none';
+        setTimeout(doLogin, 150);
+    }
+
+    function loginSuccess(user) {
+        const overlay = document.getElementById('loginOverlay');
+        overlay.classList.add('hide');
+        setTimeout(() => overlay.style.display = 'none', 400);
+        const headerUser = document.getElementById('headerUser');
+        const initials   = user.name.split(' ').map(w => w[0]).join('').toUpperCase();
+        document.getElementById('headerAvatar').textContent = initials;
+        document.getElementById('headerName').textContent   = user.name;
+        headerUser.style.display = 'flex';
+    }
+
+    function doLogout() {
+        const overlay = document.getElementById('loginOverlay');
+        overlay.style.display = 'flex';
+        overlay.classList.remove('hide');
+        document.getElementById('headerUser').style.display = 'none';
+        document.getElementById('loginEmail').value = '';
+        document.getElementById('loginPassword').value = '';
+        document.getElementById('loginError').style.display = 'none';
+    }
+
+    document.addEventListener('keydown', e => {
+        if (e.key === 'Enter' && document.getElementById('loginOverlay').style.display !== 'none') doLogin();
+    });
+</script>
+</body>
+</html>

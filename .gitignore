@@ -1,0 +1,37 @@
+# 🔹 Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# 🔹 Virtual environment
+.venv/
+venv/
+env/
+
+# 🔹 Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# 🔹 Dataset (VERY IMPORTANT)
+data/
+
+# 🔹 OS files
+.DS_Store
+Thumbs.db
+
+# 🔹 Logs
+*.log
+
+# 🔹 Model files (optional)
+# Uncomment if your model is large
+# models/
+
+# 🔹 Flask uploads (temporary files)
+static/uploads/
+
+# 🔹 IDE files
+.vscode/
+.idea/
+
+# 🔹 Environment variables
+.env
